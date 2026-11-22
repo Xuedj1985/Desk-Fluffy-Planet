@@ -1,5 +1,9 @@
 # 糖绒星球 · Xome-Desk-Fluffy-Planet
 
+[![Tests](https://github.com/Xuedj1985/Xome-Desk-Fluffy-Planet/actions/workflows/test.yml/badge.svg)](https://github.com/Xuedj1985/Xome-Desk-Fluffy-Planet/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D6.svg)](#系统要求)
+
 > 一块铺在 Windows 桌面层上的「玻璃收藏柜」：壁纸之上、所有应用之下，不抢焦点，空白处点击穿透给真实桌面。
 
 ![界面预览](docs/planet-theme-1920.png)
