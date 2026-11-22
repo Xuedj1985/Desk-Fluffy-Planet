@@ -28,3 +28,6 @@ desktop.ini
 
 # 内部开发交接文档（不公开）
 app-dev-handoff/
+
+# 本地工具（便携 gh 等）
+.tools/

@@ -44,7 +44,9 @@
 
 ## 下载与使用
 
-1. 打开本仓库的 **[Releases](../../releases)** 页面，下载最新的 `糖绒星球-1.0.0-win64.zip`。
+1. 打开本仓库的 **[Releases](../../releases)** 页面，下载最新的 `FluffyPlanet-1.0.0-win64.zip`。
+   - 直链：`https://github.com/Xuedj1985/Desk-Fluffy-Planet/releases/latest`
+   - 国内下载慢时，可使用 GitHub 加速代理：`https://ghfast.top/` + 直链
 2. 解压到任意目录，双击 `糖绒星球.exe` 运行。
 3. 首次运行若被 Windows SmartScreen 拦截，点「更多信息 → 仍要运行」（未签名的开源程序常见提示）。
 4. 需要桌面快捷方式时，运行包内 `创建桌面快捷方式.bat`。
