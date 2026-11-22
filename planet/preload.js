@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('planet', {
 
   onCmd: cb => ipcRenderer.on('planet:cmd', (_e, name) => cb(name)),
   onDesktop: cb => ipcRenderer.on('planet:desktop', (_e, d) => cb(d)),
+  onShelf: cb => ipcRenderer.on('planet:shelf', (_e, d) => cb(d)),
   onDisplay: cb => ipcRenderer.on('planet:display', (_e, d) => cb(d)),
   onScreen: cb => ipcRenderer.on('planet:screen', (_e, s) => cb(s)),
   onResync: cb => ipcRenderer.on('planet:resync', () => cb()),

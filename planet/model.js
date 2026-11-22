@@ -124,6 +124,15 @@
 
   function seriesOf(key) { return SERIES[key] || SERIES.starman; }
 
+  /** 扩展模式下需要铺「副屏粉色背景」的显示器边界（排除主屏、排除无效尺寸）。
+      displays 为 Electron screen.getAllDisplays() 的返回，primaryId 为主屏 id。 */
+  function secondaryBounds(displays, primaryId) {
+    if (!Array.isArray(displays)) return [];
+    return displays
+      .filter(d => d && d.id !== primaryId && d.bounds && d.bounds.width >= 2 && d.bounds.height >= 2)
+      .map(d => ({ x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height }));
+  }
+
   function stagesFor(n) { return STAGES[clampCount(n)] || STAGES[SLOT_MAX]; }
 
   /** 交换两个槽位；越界或同位一律原样返回，不抛错、不复制错位 */
@@ -405,7 +414,7 @@
     BASE_W, BASE_H, STAGE_MAX_W, SLOT_MIN, SLOT_MAX, ALBUM_SIZE,
     SERIES, SERIES_KEYS, STAGES,
     DISPLAY_PRESETS, DISPLAY_KEYS, displayPresetLabel,
-    stageWidth, computeFit, fitFor, clampCount, seriesOf, stagesFor,
+    stageWidth, computeFit, fitFor, clampCount, seriesOf, stagesFor, secondaryBounds,
     swapSlots, removeAt, insertAt, rowFromY,
     gridPositions, clampPos, clampPose, poseScale, stepDepth, clampDepth, depthRanks, DEPTH_MIN, DEPTH_MAX, shortName, spineChars, boxRows, lightenInk, INK_MIX, dragOrigin,
     DOCK_COLS, clampDockCols, normalizeDock, reconcileDock, moveDockItem, setDockCols,

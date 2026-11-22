@@ -163,6 +163,17 @@ t('discard 后书架不再有这一条', () => assert.ok(!store2.entries().some(
 t('discard 写了日志', () => assert.ok(store2.journalTail(6).some(x => x.op === 'shelf-discard')));
 t('discard 不存在的条目明确失败', () => assert.strictEqual(store2.discard('nope').ok, false));
 
+// 13. 文件在收纳目录里被外部删除后，entries() 要自动剔除（不留幽灵书脊）
+const ghost = path.join(desktop, '幽灵文件.txt');
+fs.writeFileSync(ghost, 'ghost');
+const rgh = store2.shelve(ghost, 1);
+t('幽灵文件已收纳（storedPath 存在）', () => assert.ok(fs.existsSync(rgh.entry.storedPath)));
+fs.rmSync(rgh.entry.storedPath, { force: true });
+t('外部删除后 entries() 不再返回该条', () => assert.ok(!store2.entries().some(e => e.id === rgh.entry.id)));
+const savedGhost = JSON.parse(fs.readFileSync(path.join(dataDir, 'shelf.json'), 'utf8'));
+t('剔除后已落盘（shelf.json 不再含该条）', () => assert.ok(!savedGhost.entries.some(e => e.id === rgh.entry.id)));
+t('剔除写了 prune-missing 日志', () => assert.ok(store2.journalTail(12).some(x => x.op === 'prune-missing')));
+
 console.log('');
 console.log(`结果：通过 ${pass}，失败 ${fail}`);
 fs.rmSync(root, { recursive: true, force: true });

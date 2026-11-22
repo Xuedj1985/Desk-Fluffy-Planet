@@ -79,7 +79,25 @@ class Store {
     fs.appendFileSync(this.journalFile, line, 'utf8');
   }
 
+  /** 书架条目。若文件已被外部（资源管理器 / 回收站）删掉，storedPath 已不存在，
+      这里直接剔除并落盘，避免书架残留一个点不开的幽灵书脊。 */
   entries() {
+    const alive = [];
+    const dropped = [];
+    for (const e of this.data.entries) {
+      const hasStored = e && typeof e.storedPath === 'string' && exists(e.storedPath);
+      // 解散后文件回到桌面（storedPath 不在书架、restoredPath 还在）也算存活，供下次启动收回
+      const hasRestored = e && typeof e.restoredPath === 'string' && exists(e.restoredPath);
+      if (hasStored || hasRestored) alive.push(e);
+      else dropped.push(e);
+    }
+    if (dropped.length) {
+      this.data.entries = alive;
+      for (const e of dropped) {
+        this.journal({ op: 'prune-missing', id: e && e.id, name: e && e.name, storedPath: e && e.storedPath });
+      }
+      try { this._save(); } catch (err) { /* 落盘失败也不影响本次展示 */ }
+    }
     return this.data.entries;
   }
 

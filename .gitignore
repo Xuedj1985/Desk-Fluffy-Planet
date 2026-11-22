@@ -25,3 +25,6 @@ desktop.ini
 
 # 内部工具目录
 .workbuddy/
+
+# 内部开发交接文档（不公开）
+app-dev-handoff/

@@ -15,7 +15,7 @@ const os = require('os');
 const { execFile } = require('child_process');
 const { Store } = require('../room/store');
 const { PlayerState, MODES, isAudioPathAllowed } = require('../room/player-state');
-const { DISPLAY_PRESETS } = require('./model');
+const { DISPLAY_PRESETS, SERIES, secondaryBounds } = require('./model');
 const { pathToFileURL } = require('node:url');
 
 const MODE = (process.env.PLANET_MODE || 'desktop').toLowerCase();
@@ -45,6 +45,8 @@ let win = null;
 let hwnd = 0;
 let timer = null;
 let watcher = null;
+let shelfWatcher = null;
+let secondaryWins = [];
 let win32 = null;
 let store = null;
 let tray = null;
@@ -252,6 +254,39 @@ function applyZOrder() {
     if (MODE === 'top') { win.setAlwaysOnTop(true, 'screen-saver'); return; }
     win32.pinAboveDesktop(hwnd);
   } catch (e) { /* 单次失败忽略，下一次定时重锚 */ }
+}
+
+/* 副屏：扩展模式下主屏显示完整画面，副屏只铺一层纯粉色背景（无任何元素）。
+   - 每个非主显示器一个窗口，铺满其 bounds
+   - 点击穿透（forward:true）、不抢焦点、不进任务栏，锚定在桌面层
+   - 显示器插拔 / 分辨率变化时重建                                           */
+function closeSecondary() {
+  for (const w of secondaryWins) { try { if (!w.isDestroyed()) w.destroy(); } catch (e) {} }
+  secondaryWins = [];
+}
+
+function openSecondary() {
+  if (process.env.XOME_TEST_NO_PIN) return;   // 测试沙箱不弹副屏
+  closeSecondary();
+  const primaryId = screen.getPrimaryDisplay().id;
+  for (const b of secondaryBounds(screen.getAllDisplays(), primaryId)) {
+    const w = new BrowserWindow({
+      x: b.x, y: b.y, width: b.width, height: b.height,
+      frame: false, transparent: false, backgroundColor: '#FFF3F8', hasShadow: false,
+      resizable: false, movable: false, minimizable: false, maximizable: false,
+      fullscreenable: false, focusable: false, skipTaskbar: true, show: false,
+      type: 'toolbar',
+      webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+    });
+    w.setIgnoreMouseEvents(true, { forward: true });
+    w.loadFile(path.join(__dirname, 'secondary.html'));
+    w.once('ready-to-show', () => {
+      if (w.isDestroyed()) return;
+      w.showInactive();
+      try { if (win32) win32.pinAboveDesktop(win32.hwndOf(w)); } catch (e) {}
+    });
+    secondaryWins.push(w);
+  }
 }
 
 /* ---------------- 初始化 / 桌面 ---------------- */
@@ -690,47 +725,91 @@ function normPose(p) {
   return pose;
 }
 
-function readShow() {
-  const raw = readJson(FIGURES_FILE, null);
-  const base = {
-    series: 'starman', count: 5,
+/* 展柜数据：每个系列各自一套图片 / 名字 / 摆位 / 站位数。
+   旧版是全局一套、切系列只换背景，导致「不同系列看到的图一样」；这里改成
+   seriesData[系列] = { files, names, poses }、counts[系列] = 站位数，互不影响。
+   labels 仍是「系列键 → 自定义铭牌名」的全局映射。 */
+function emptySeries() {
+  return {
     files: [null, null, null, null, null, null],
     names: ['', '', '', '', '', ''],
     poses: [null, null, null, null, null, null],
-    labels: {},
   };
-  if (!raw) return base;
-  base.series = typeof raw.series === 'string' && raw.series ? raw.series : base.series;
-  base.count = Math.max(1, Math.min(6, Number(raw.count) || 5));
+}
+
+function normSeriesData(d) {
+  const out = emptySeries();
   for (let i = 0; i < 6; i++) {
-    base.files[i] = raw.files && typeof raw.files[i] === 'string' ? raw.files[i] : null;
-    base.names[i] = raw.names && typeof raw.names[i] === 'string' ? raw.names[i] : '';
-    base.poses[i] = normPose(raw.poses && raw.poses[i]);
+    out.files[i] = d && d.files && typeof d.files[i] === 'string' ? d.files[i] : null;
+    out.names[i] = d && d.names && typeof d.names[i] === 'string' ? d.names[i] : '';
+    out.poses[i] = normPose(d && d.poses && d.poses[i]);
   }
+  return out;
+}
+
+const SERIES_KEY_RE = /^[\w-]{1,16}$/;
+
+function readShow() {
+  const raw = readJson(FIGURES_FILE, null) || {};
+  const series = (typeof raw.series === 'string' && SERIES_KEY_RE.test(raw.series)) ? raw.series : 'starman';
+  const seriesData = {};
+  const counts = {};
+  const isNew = raw.seriesData && typeof raw.seriesData === 'object';
+  if (isNew) {
+    for (const k of Object.keys(raw.seriesData)) {
+      if (SERIES_KEY_RE.test(k)) seriesData[k] = normSeriesData(raw.seriesData[k]);
+    }
+    if (raw.counts && typeof raw.counts === 'object') {
+      for (const [k, v] of Object.entries(raw.counts)) {
+        if (SERIES_KEY_RE.test(k) && Number.isFinite(Number(v))) counts[k] = Math.max(1, Math.min(6, Math.round(Number(v))));
+      }
+    }
+  } else {
+    // 旧格式迁移：全局 files/names/poses/count 归到当前 series（文件路径保持不动，无需搬文件）
+    seriesData[series] = normSeriesData({ files: raw.files, names: raw.names, poses: raw.poses });
+    if (Number.isFinite(Number(raw.count))) counts[series] = Math.max(1, Math.min(6, Math.round(Number(raw.count))));
+  }
+  const labels = {};
   if (raw.labels && typeof raw.labels === 'object') {
     for (const [k, v] of Object.entries(raw.labels)) {
-      if (typeof v === 'string' && v.trim()) base.labels[k] = v.trim().slice(0, 8);
+      if (typeof v === 'string' && v.trim()) labels[k] = v.trim().slice(0, 8);
     }
   }
-  return base;
+  return { series, seriesData, counts, labels };
+}
+
+function seriesDataOf(cfg, key) {
+  if (!cfg.seriesData[key]) cfg.seriesData[key] = emptySeries();
+  return cfg.seriesData[key];
+}
+
+function defaultCount(key) {
+  const s = SERIES && SERIES[key];
+  return s ? Math.max(1, Math.min(6, s.slots | 0)) : 5;
+}
+
+function countOf(cfg, key) {
+  return Number.isFinite(cfg.counts[key]) ? cfg.counts[key] : defaultCount(key);
 }
 
 function showView(cfg) {
+  const key = cfg.series;
+  const data = seriesDataOf(cfg, key);
   const slots = [];
   for (let i = 0; i < 6; i++) {
-    const f = cfg.files[i];
+    const f = data.files[i];
     if (!f) { slots.push(null); continue; }
     let stamp = 0;
     try { stamp = fs.statSync(path.join(DATA_DIR, f)).mtimeMs; } catch (e) { stamp = 0; }
     if (!stamp) { slots.push(null); continue; }   // 文件被手工删掉就当这一位空着
     slots.push({
       url: pathToFileURL(path.join(DATA_DIR, f)).href + '?v=' + Math.round(stamp),
-      name: cfg.names[i] || '',
+      name: data.names[i] || '',
     });
   }
   return {
-    series: cfg.series, count: cfg.count, slots, max: 6, min: 1,
-    poses: cfg.poses, labels: cfg.labels,
+    series: key, count: countOf(cfg, key), slots, max: 6, min: 1,
+    poses: data.poses, labels: cfg.labels,
   };
 }
 
@@ -766,15 +845,18 @@ function setFigure(slot, src) {
   if (st.size > FIGURE_MAX) return { ok: false, error: '图片请小于 5MB' };
 
   const cfg = readShow();
-  const file = 'figures/s' + i + ext;
+  const data = seriesDataOf(cfg, cfg.series);
+  // 图片按「系列」分目录存，避免不同系列的同一站位互相覆盖
+  const file = 'figures/' + cfg.series + '/s' + i + ext;
   try {
-    fs.mkdirSync(FIGURES_DIR, { recursive: true });
+    fs.mkdirSync(path.join(FIGURES_DIR, cfg.series), { recursive: true });
     fs.writeFileSync(path.join(DATA_DIR, file), fs.readFileSync(p));
   } catch (e) { return { ok: false, error: '图片写入失败：' + e.message }; }
 
-  const old = cfg.files[i];
-  cfg.files[i] = file;
-  cfg.names[i] = path.basename(p, path.extname(p)).slice(0, 14);
+  const old = data.files[i];
+  data.files[i] = file;
+  data.names[i] = path.basename(p, path.extname(p)).slice(0, 14);
+  if (!Number.isFinite(cfg.counts[cfg.series])) cfg.counts[cfg.series] = defaultCount(cfg.series);
   writeJson(FIGURES_FILE, cfg);
   if (old && old !== file) { try { fs.unlinkSync(path.join(DATA_DIR, old)); } catch (e) {} }
   return { ok: true, showcase: showView(cfg), hint: staticImageHint(p, ext) };
@@ -798,9 +880,10 @@ ipcMain.handle('planet:figure-clear', (_e, slot) => {
   const i = Number(slot);
   if (!Number.isInteger(i) || i < 0 || i >= 6) return { ok: false, error: '展柜没有这个位置' };
   const cfg = readShow();
-  const old = cfg.files[i];
-  cfg.files[i] = null;
-  cfg.names[i] = '';
+  const data = seriesDataOf(cfg, cfg.series);
+  const old = data.files[i];
+  data.files[i] = null;
+  data.names[i] = '';
   writeJson(FIGURES_FILE, cfg);
   if (old) { try { fs.unlinkSync(path.join(DATA_DIR, old)); } catch (e) {} }
   return { ok: true, showcase: showView(cfg) };
@@ -813,29 +896,36 @@ ipcMain.handle('planet:figure-swap', (_e, a, b) => {
     return { ok: false, error: '展柜没有这个位置' };
   if (i === j) return { ok: true, showcase: showView(readShow()) };
   const cfg = readShow();
-  const tf = cfg.files[i], tn = cfg.names[i], tp = cfg.poses[i];
-  cfg.files[i] = cfg.files[j]; cfg.names[i] = cfg.names[j]; cfg.poses[i] = cfg.poses[j];
-  cfg.files[j] = tf; cfg.names[j] = tn; cfg.poses[j] = tp;
+  const data = seriesDataOf(cfg, cfg.series);
+  const tf = data.files[i], tn = data.names[i], tp = data.poses[i];
+  data.files[i] = data.files[j]; data.names[i] = data.names[j]; data.poses[i] = data.poses[j];
+  data.files[j] = tf; data.names[j] = tn; data.poses[j] = tp;
   writeJson(FIGURES_FILE, cfg);
   return { ok: true, showcase: showView(cfg) };
 });
 
-/** 只改系列与站位数：已上传的图一律保留，数组不缩短 */
+/** 保存展柜配置。
+  - 传 series 且与当前不同：只切换系列（不把旧系列的 count/poses 带过去）；
+  - 否则：把 count / poses 写回当前系列；labels 是全局映射。 */
 ipcMain.handle('planet:figure-save', (_e, patch) => {
   const cfg = readShow();
   const p = patch && typeof patch === 'object' ? patch : {};
-  if (typeof p.series === 'string' && /^[\w-]{1,16}$/.test(p.series)) cfg.series = p.series;
-  if (Number.isFinite(Number(p.count))) cfg.count = Math.max(1, Math.min(6, Math.round(Number(p.count))));
-  if (Array.isArray(p.poses)) {
-    cfg.poses = [null, null, null, null, null, null];
-    for (let i = 0; i < 6; i++) {
-      cfg.poses[i] = normPose(p.poses[i]);
+  const switching = typeof p.series === 'string' && SERIES_KEY_RE.test(p.series) && p.series !== cfg.series;
+  if (switching) {
+    cfg.series = p.series;
+    seriesDataOf(cfg, cfg.series);   // 确保该系列有数据槽（默认空）
+  } else {
+    const data = seriesDataOf(cfg, cfg.series);
+    if (Number.isFinite(Number(p.count))) cfg.counts[cfg.series] = Math.max(1, Math.min(6, Math.round(Number(p.count))));
+    if (Array.isArray(p.poses)) {
+      data.poses = [null, null, null, null, null, null];
+      for (let i = 0; i < 6; i++) data.poses[i] = normPose(p.poses[i]);
     }
   }
   if (p.labels && typeof p.labels === 'object' && !Array.isArray(p.labels)) {
     cfg.labels = {};
     for (const [k, v] of Object.entries(p.labels)) {
-      if (/^[\w-]{1,16}$/.test(k) && typeof v === 'string' && v.trim()) cfg.labels[k] = v.trim().slice(0, 8);
+      if (SERIES_KEY_RE.test(k) && typeof v === 'string' && v.trim()) cfg.labels[k] = v.trim().slice(0, 8);
     }
   }
   writeJson(FIGURES_FILE, cfg);
@@ -1114,6 +1204,7 @@ app.whenReady().then(() => {
   console.log('[store] 收纳目录', store.shelfDir, '条目', store.entries().length);
 
   createWindow();
+  openSecondary();
   if (!process.env.XOME_TEST_NO_PIN) createTray();
 
   if (MODE === 'desktop' && win32) {
@@ -1135,7 +1226,12 @@ app.whenReady().then(() => {
     win.setBounds(screen.getPrimaryDisplay().workArea);
     applyZOrder();
     win.webContents.send('planet:screen', screenInfo());
+    openSecondary();
   });
+
+  // 插拔显示器 / 切换扩展模式：重建副屏粉色背景
+  screen.on('display-added', () => openSecondary());
+  screen.on('display-removed', () => openSecondary());
 
   try {
     watcher = fs.watch(DESKTOP, { persistent: false }, () => {
@@ -1144,6 +1240,18 @@ app.whenReady().then(() => {
       watcher._t = setTimeout(() => win.webContents.send('planet:desktop', listDesktop()), 400);
     });
   } catch (e) { /* 桌面监听失败不影响主流程 */ }
+
+  // 书架目录也要监听：文件在「糖绒星球书架」里被外部删掉/改动时，
+  // 及时推送最新条目，避免书架残留一个点不开的幽灵书脊。
+  try {
+    shelfWatcher = fs.watch(store.shelfDir, { persistent: false, recursive: true }, () => {
+      if (!win || win.isDestroyed()) return;
+      clearTimeout(shelfWatcher._t);
+      shelfWatcher._t = setTimeout(() => {
+        try { win.webContents.send('planet:shelf', { entries: store.entries(), audit: store.audit() }); } catch (e) {}
+      }, 350);
+    });
+  } catch (e) { /* 书架监听失败不影响主流程 */ }
 });
 
 app.on('window-all-closed', () => app.quit());
@@ -1158,5 +1266,7 @@ app.on('before-quit', () => {
   try { fs.unlinkSync(PID_FILE); } catch (e) {}
   if (tray) { try { tray.destroy(); } catch (e) {} }
   if (timer) clearInterval(timer);
+  if (shelfWatcher) { try { shelfWatcher.close(); } catch (e) {} }
+  closeSecondary();
   if (watcher) try { watcher.close(); } catch (e) {}
 });

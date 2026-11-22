@@ -5,13 +5,13 @@
   "main": "planet/main.js",
   "license": "MIT",
   "author": "Fluffy Planet",
-  "homepage": "https://github.com/YOUR_GITHUB_NAME/fluffy-planet#readme",
+  "homepage": "https://github.com/Xuedj1985/Desk-Fluffy-Planet#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/YOUR_GITHUB_NAME/fluffy-planet.git"
+    "url": "https://github.com/Xuedj1985/Desk-Fluffy-Planet.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_GITHUB_NAME/fluffy-planet/issues"
+    "url": "https://github.com/Xuedj1985/Desk-Fluffy-Planet/issues"
   },
   "keywords": [
     "electron",

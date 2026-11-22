@@ -411,6 +411,21 @@ try {
     todoFit.listBottom <= todoFit.zoneBottom - 6 && todoFit.noteBottom <= todoFit.zoneBottom,
     'border ' + dom.todoBorder + 'px / 底部余量 ' + Math.round(todoFit.pad) + 'px');
   ok('模式按钮是短标签 + 状态在 tooltip', dom.mode === '模式' && /列表循环/.test(dom.modeTitle), dom.mode + ' / ' + dom.modeTitle);
+
+  // 便签高度随文字行数自适应：一行矮、多行高，列表行高为 min-content
+  const todoAdapt = JSON.parse(await ev(`JSON.stringify((()=>{
+    const card=document.querySelector('.todo:not(.add)');
+    const txt=card.querySelector('.todo__text');
+    const orig=txt.textContent;
+    const h1=card.offsetHeight;
+    txt.textContent='这是一段很长的愿望文字'.repeat(8);
+    const h2=card.offsetHeight;
+    txt.textContent=orig;
+    return { h1, h2, rows:getComputedStyle(document.querySelector('#todoList')).gridAutoRows };
+  })())`));
+  ok('便签高度随文字行数自适应（多行更高、行高 min-content）',
+    todoAdapt.h2 > todoAdapt.h1 && todoAdapt.h1 >= 28 && /min-content/.test(todoAdapt.rows),
+    JSON.stringify(todoAdapt));
   // 用 offsetTop/offsetHeight（布局坐标）而不是 getBoundingClientRect：
   // .music 现在整体旋转 -1.6deg，外接矩形会被放大而失真。
   const musicFit = JSON.parse(await ev(`JSON.stringify((()=>{
@@ -446,8 +461,9 @@ try {
     await new Promise(r=>setTimeout(r,220));
     const fig = document.querySelector('.figure[data-i="0"]');
     const r = fig.getBoundingClientRect();
-    document.dispatchEvent(new MouseEvent('mousemove', { bubbles:true, clientX:r.left+r.width/2, clientY:r.top+r.height/2 }));
-    await new Promise(r2=>requestAnimationFrame(()=>requestAnimationFrame(r2)));
+    // 直接把指针放到玩偶中心并同步重算一次穿透（不依赖 rAF 时序）
+    lastPointer = { x: r.left + r.width/2, y: r.top + r.height/2 };
+    syncIgnoreAtPointer();
     return JSON.stringify({ a, b, ignoring });
   })()`, true));
   ok('隐藏/显示星球后仍可见且可点击（不卡穿透）',
@@ -562,7 +578,7 @@ try {
     return JSON.stringify({ok:r.ok, err:r.error||'', src:(document.querySelector('.figure[data-i="0"] img')||{}).src||''});
   })()`, true);
   const f1 = JSON.parse(figSet);
-  ok('PNG 上传后真的出现 <img>', f1.ok && /\/figures\/s0\.png/.test(f1.src), f1.src);
+  ok('PNG 上传后真的出现 <img>', f1.ok && /\/figures\/starman\/s0\.png/.test(f1.src), f1.src);
 
   const gifSet = await ev(`(async()=>{
     const r = await window.planet.figureSet(1, ${JSON.stringify(FIG_GIF)});
@@ -570,7 +586,7 @@ try {
     return JSON.stringify({ok:r.ok, src:(document.querySelector('.figure[data-i="1"] img')||{}).src||''});
   })()`, true);
   const f2 = JSON.parse(gifSet);
-  ok('GIF 不转码原样保留', f2.ok && /\/figures\/s1\.gif/.test(f2.src), f2.src);
+  ok('GIF 不转码原样保留', f2.ok && /\/figures\/starman\/s1\.gif/.test(f2.src), f2.src);
   await sleep(350);
   const gifDecoded = JSON.parse(await ev(`JSON.stringify((()=>{
     const im=document.querySelector('.figure[data-i="1"] img');
@@ -580,7 +596,7 @@ try {
     !!gifDecoded && gifDecoded.complete && gifDecoded.w > 0 && gifDecoded.h > 0,
     JSON.stringify(gifDecoded));
   const srcBytes = fs.readFileSync(FIG_GIF);
-  const dstBytes = fs.readFileSync(path.join(data, 'figures', 's1.gif'));
+  const dstBytes = fs.readFileSync(path.join(data, 'figures', 'starman', 's1.gif'));
   ok('GIF 字节与源文件完全一致（未转码 / 未丢帧）',
     srcBytes.length === dstBytes.length && srcBytes.equals(dstBytes),
     srcBytes.length + ' vs ' + dstBytes.length);
@@ -602,30 +618,27 @@ try {
   ok('减两位回到 4 只', afterMinus.n === 4 && afterMinus.c === 4, JSON.stringify(afterMinus));
 
   await clickSel('#seriesTabs button[data-k="caramel"]');
-  await sleep(260);
+  await sleep(300);
   const car = JSON.parse(await ev(`JSON.stringify({s:S.show.series,c:S.show.count,n:document.querySelectorAll('.figure').length,kept:S.show.slots.filter(Boolean).length})`));
-  // 切系列只换主题：站位数保持切之前的 4，图全保留（旧实现会被 caramel 默认 3 覆盖）
-  ok('切焦糖主题：站位数保持 4 且已上传图保留', car.s === 'caramel' && car.c === 4 && car.n === 4 && car.kept === 2, JSON.stringify(car));
+  // 每系列独立：焦糖是全新系列，默认 3 位、不带星星人的图
+  ok('切到焦糖：独立系列，默认 3 位且不带星星人的图',
+    car.s === 'caramel' && car.c === 3 && car.n === 3 && car.kept === 0, JSON.stringify(car));
 
-  // 回归：插满 5 张后切到默认位更少的系列再切回，5 张都应还在（不因 count 被改而少显示）
+  // 回归：系列各自独立——切到 big37 是它自己的空展柜，切回星星人仍保留原来的 2 张
   const seriesKeep = JSON.parse(await ev(`(async()=>{
-    const r = await window.planet.figureSave({ series:'starman', count:5 });
-    if (r.ok) S.show = r.showcase;
-    renderShow();
-    const before = document.querySelectorAll('.figure').length;
-    const keptBefore = S.show.slots.filter(Boolean).length;
+    const carKept = S.show.slots.filter(Boolean).length;
     switchSeries('big37');
-    await new Promise(r=>setTimeout(r,240));
-    const after = document.querySelectorAll('.figure').length;
-    const cAfter = S.show.count;
-    const keptAfter = S.show.slots.filter(Boolean).length;
+    await new Promise(r=>setTimeout(r,300));
+    const big = { c:S.show.count, kept:S.show.slots.filter(Boolean).length, n:document.querySelectorAll('.figure').length };
     switchSeries('starman');
-    await new Promise(r=>setTimeout(r,240));
-    return JSON.stringify({ before, after, cAfter, back:document.querySelectorAll('.figure').length, keptBefore, keptAfter });
+    await new Promise(r=>setTimeout(r,300));
+    const star = { c:S.show.count, kept:S.show.slots.filter(Boolean).length, n:document.querySelectorAll('.figure').length };
+    return JSON.stringify({ carKept, big, star });
   })()`, true));
-  ok('切系列不减少图片（5 位切 big37 仍 5 位、已上传图不丢）',
-    seriesKeep.before === 5 && seriesKeep.after === 5 && seriesKeep.cAfter === 5 && seriesKeep.back === 5 &&
-    seriesKeep.keptBefore === 2 && seriesKeep.keptAfter === 2,
+  ok('系列各自独立：big37 自己空展柜、切回星星人仍保留原 2 张',
+    seriesKeep.carKept === 0 &&
+    seriesKeep.big.c === 1 && seriesKeep.big.kept === 0 && seriesKeep.big.n === 1 &&
+    seriesKeep.star.c === 4 && seriesKeep.star.kept === 2 && seriesKeep.star.n === 4,
     JSON.stringify(seriesKeep));
 
   const beforeSwap = JSON.parse(await ev(`JSON.stringify(S.show.slots.map(x=>x&&x.name))`));
@@ -690,8 +703,9 @@ try {
     's ' + pose0.s + '→' + posed.s + ' / z ' + pose0.z + '→' + posed.z);
 
   const showPoseDisk = JSON.parse(fs.readFileSync(path.join(data, 'showcase.json'), 'utf8'));
-  ok('自由摆位写进 showcase.json', !!(showPoseDisk.poses && showPoseDisk.poses[0]),
-    JSON.stringify(showPoseDisk.poses && showPoseDisk.poses[0]));
+  const starPoses = showPoseDisk.seriesData && showPoseDisk.seriesData.starman && showPoseDisk.seriesData.starman.poses;
+  ok('自由摆位写进 showcase.json（seriesData.starman.poses）', !!(starPoses && starPoses[0]),
+    JSON.stringify(starPoses && starPoses[0]));
 
   await clickSel('#poseReset');
   await sleep(600);
@@ -731,9 +745,10 @@ try {
 
   await sleep(500);
   const zoomDisk = JSON.parse(fs.readFileSync(path.join(data, 'showcase.json'), 'utf8'));
+  const zoomPoses = zoomDisk.seriesData && zoomDisk.seriesData.starman && zoomDisk.seriesData.starman.poses;
   ok('缩放写进 showcase.json 的 poses[0].zoom',
-    !!(zoomDisk.poses && zoomDisk.poses[0] && Math.abs(zoomDisk.poses[0].zoom - 1.1) < 0.001),
-    JSON.stringify(zoomDisk.poses && zoomDisk.poses[0]));
+    !!(zoomPoses && zoomPoses[0] && Math.abs(zoomPoses[0].zoom - 1.1) < 0.001),
+    JSON.stringify(zoomPoses && zoomPoses[0]));
 
   await wheelAt(wheelGrip.x, wheelGrip.y, 120);
   await sleep(160);
@@ -796,12 +811,16 @@ try {
   await sleep(450);
 
   const showJson = JSON.parse(fs.readFileSync(path.join(data, 'showcase.json'), 'utf8'));
-  // 回归后停在 starman / 5 位（切系列不再改 count）
-  ok('展柜配置落盘（series / count / files）',
-    showJson.series === 'starman' && showJson.count === 5 && showJson.files.filter(Boolean).length === 2,
-    JSON.stringify({ s: showJson.series, c: showJson.count }));
-  ok('形象文件落在 figures/ 且没有二进制塞进 JSON',
-    fs.existsSync(path.join(data, 'figures', 's0.png')) && fs.existsSync(path.join(data, 'figures', 's1.gif')));
+  // 新格式：seriesData[系列] 各自一套 files/names/poses，counts[系列] 各自一个站位数
+  ok('展柜配置落盘（seriesData / counts 每系列独立）',
+    showJson.series === 'starman' &&
+    showJson.seriesData && showJson.seriesData.starman &&
+    showJson.seriesData.starman.files.filter(Boolean).length === 2 &&
+    showJson.counts && showJson.counts.starman === 4,
+    JSON.stringify({ s: showJson.series, counts: showJson.counts }));
+  ok('形象文件落在 figures/<系列>/ 且没有二进制塞进 JSON',
+    fs.existsSync(path.join(data, 'figures', 'starman', 's0.png')) &&
+    fs.existsSync(path.join(data, 'figures', 'starman', 's1.gif')));
 
   await clickSel('#seriesTabs button[data-k="starman"]');
   await sleep(260);

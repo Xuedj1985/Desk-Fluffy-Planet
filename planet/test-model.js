@@ -305,5 +305,24 @@ t('内置全部格式色浅化后与深墨字对比度 ≥4.5', () => {
 });
 
 console.log('');
+// 副屏边界：扩展模式下取「非主屏」的显示器 bounds
+const dsp = [
+  { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } },
+  { id: 2, bounds: { x: 1920, y: -200, width: 2560, height: 1440 } },
+  { id: 3, bounds: { x: 0, y: 0, width: 0, height: 0 } },
+];
+t('副屏边界：排除主屏，保留副屏（含负坐标）', () => {
+  const r = PM.secondaryBounds(dsp, 1);
+  assert.strictEqual(r.length, 1);
+  assert.deepStrictEqual(r[0], { x: 1920, y: -200, width: 2560, height: 1440 });
+});
+t('副屏边界：单屏时为空', () => {
+  assert.deepStrictEqual(PM.secondaryBounds([{ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }], 1), []);
+});
+t('副屏边界：非法输入返回空数组', () => {
+  assert.deepStrictEqual(PM.secondaryBounds(null, 1), []);
+  assert.deepStrictEqual(PM.secondaryBounds([], 1), []);
+});
+
 console.log('结果：通过 ' + pass + '，失败 ' + fail);
 process.exit(fail ? 1 : 0);

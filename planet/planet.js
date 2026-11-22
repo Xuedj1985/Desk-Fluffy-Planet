@@ -578,7 +578,7 @@ function renderFloor(newOnes) {
     d.addEventListener('pointerdown', e => onFileDown(e, f));
     d.addEventListener('dblclick', e => { e.stopPropagation(); window.planet.open(f.path); });
     d.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); fileMenu(e, f); });
-    d.addEventListener('mouseenter', e => showTip(e.clientX, e.clientY, f.name + '　拖到书架收纳，拖到展柜/相册可以放图'));
+    d.addEventListener('mouseenter', e => showTip(e.clientX, e.clientY, f.name));
     d.addEventListener('mouseleave', hideTip);
     floorHolder.appendChild(d);
   }
@@ -634,7 +634,7 @@ function dockItemNode(app) {
   b.append(icon, el('span', 'dock__name', PM.shortName(app.name, 4)));
   b.addEventListener('pointerdown', e => { if (e.button === 0) onDockDown(e, app); });
   b.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); dockMenu(e, app); });
-  b.addEventListener('mouseenter', e => showTip(e.clientX, e.clientY, app.name + '　拖动调整位置 · 右键更多'));
+  b.addEventListener('mouseenter', e => showTip(e.clientX, e.clientY, app.name));
   b.addEventListener('mouseleave', hideTip);
   b.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.planet.open(app.path); }
@@ -1019,8 +1019,7 @@ function renderShelf() {
         // 也不再显示子项数量角标。暖牛皮色 / 蓝灰折角只用来区分类型，不改排版。
         b.appendChild(el('span', 'spine-name', PM.shortName(entry.name, 4)));
       }
-      b.addEventListener('mouseenter', e => showTip(e.clientX, e.clientY,
-        entry.name + '　在书架内拖＝换层/排序，拖出＝还原'));
+      b.addEventListener('mouseenter', e => showTip(e.clientX, e.clientY, entry.name));
       b.addEventListener('mouseleave', hideTip);
       b.addEventListener('click', e => { e.stopPropagation(); window.planet.open(entry.storedPath); });
       b.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); bookMenu(e, entry); });
@@ -1373,18 +1372,17 @@ async function openTodoEditor(id) {
 
 /* ---------------- 展柜 ---------------- */
 
-function switchSeries(key) {
+async function switchSeries(key) {
   if (!SERIES[key]) return;
-  // 已选中的系列不再重绘标签：否则双击改名时按钮会被第一次 click 换掉，dblclick 收不到
+  // 已选中的系列不再重绘：否则双击改名时按钮会被第一次 click 换掉，dblclick 收不到
   if (key === S.show.series) return;
-  S.show.series = key;
-  // 切系列只换灯光 / 配色 / 铭牌，绝不动站位数：旧实现把 count 改成该系列的默认位
-  // （big37=1 / caramel=3 / custom=4），切过去就会让已插入的图“少显示几张”（文件其实还在）。
-  // 站位数量统一由 +/− 按钮控制，与当前停在哪个系列无关。
-  S.show.count = PM.clampCount(S.show.count);
-  persistShow();
+  // 每个系列各自一套图片 / 摆位 / 站位数：只告诉主进程「切到哪个系列」，
+  // 由它返回该系列自己的 showcase（不再把旧系列的 count/poses 带过去）。
+  const r = await window.planet.figureSave({ series: key });
+  if (!r.ok) { toast(r.error || '切换失败'); return; }
+  S.show = r.showcase;
   renderShow();
-  toast('换到「' + seriesLabel(key) + '」· 形象和摆位都还在');
+  toast('换到「' + seriesLabel(key) + '」· 这个系列有自己的形象与摆位');
 }
 
 async function persistShow() {
@@ -2305,6 +2303,13 @@ function bindEvents() {
     ensureDock();
     renderDock();
     renderFloor(fresh);
+  });
+
+  // 书架目录被外部改动（如直接在资源管理器/回收站删文件）时，同步最新的书架条目
+  window.planet.onShelf(d => {
+    if (!d) return;
+    S.shelf = d.entries || [];
+    renderShelf();
   });
 
   window.planet.onCmd(name => {
