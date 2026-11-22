@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>糖绒星球</title>
+<link rel="stylesheet" href="planet.css" />
+</head>
+<body>
+<div id="viewport">
+  <div id="app">
+    <header id="topbar">
+      <div class="brand" data-hit="ui">
+        <div class="brand__mark" id="brandMark" aria-hidden="true"></div>
+        <div class="brand__txt"><b>糖绒星球</b><span>FLUFFY PLANET<em class="brand__ver" id="brandVer">v1.0.0</em></span></div>
+      </div>
+      <div class="topbar__spacer"></div>
+      <div class="topbar__clock" data-hit="ui"><b id="clockTime">--:--</b><span id="clockDate"></span></div>
+      <button class="pill" data-hit="ui" id="btnSelect" aria-pressed="false" title="点一下资料卡就选中，可批量上架">
+        <span class="pill__dot"></span>点选模式
+      </button>
+      <button class="pill" data-hit="ui" id="btnJournal" title="Ctrl+J">收纳记录</button>
+      <button class="pill icon" data-hit="ui" id="btnHelp" title="使用说明">?</button>
+      <button class="pill icon" data-hit="ui" id="btnQuit" title="退出糖绒星球">×</button>
+    </header>
+
+    <div class="case">
+      <div class="case__sheen" aria-hidden="true"></div>
+      <div class="case__bling" aria-hidden="true"></div>
+      <div id="ambient" aria-hidden="true"></div>
+      <div class="handle" aria-hidden="true"></div>
+      <div class="bow" id="bow" aria-hidden="true"></div>
+
+      <!-- 左列 1：我的电脑 -->
+      <section id="zonePC" class="zone" data-hit="pc">
+        <div class="zone__label">我的电脑</div>
+        <div class="pc" id="pcGlass">
+          <div class="pc__screen" id="pcScreen">
+            <div class="pc__title">FLUFFY OS</div>
+            <div class="pc__time" id="pcTime">--:--</div>
+            <div class="pc__row"><span>磁盘 C:</span><b id="pcDisk">--</b></div>
+            <div class="pc__bar"><i id="pcDiskBar"></i></div>
+            <div class="pc__row"><span>内存</span><b id="pcMem">--</b></div>
+            <div class="pc__bar"><i id="pcMemBar"></i></div>
+            <div class="pc__msg" id="pcMsg" hidden></div>
+          </div>
+          <div class="pc__tower" aria-hidden="true">
+            <i></i><i></i><i></i><span class="pc__led"></span>
+          </div>
+          <div id="bin" data-hit="bin" role="button" tabindex="0" aria-label="糖果罐：把资料或书拖进来放进回收站"></div>
+        </div>
+      </section>
+
+      <!-- 左列 2：甜甜相册 -->
+      <section id="zoneAlbum" class="zone">
+        <div class="zone__label">甜甜相册</div>
+        <svg class="rope" viewBox="0 0 352 50" aria-hidden="true">
+          <path d="M0 18 Q88 42 176 18 T352 18" fill="none" stroke="#B98F7E" stroke-width="2.4" stroke-linecap="round" />
+          <path d="M0 18 Q88 42 176 18 T352 18" fill="none" stroke="#FFF7EA" stroke-width="1" stroke-dasharray="3 9" opacity=".7" />
+        </svg>
+        <div id="polaroids"></div>
+      </section>
+
+      <!-- 左列 3：今日小愿望 -->
+      <section id="zoneTodo" class="zone">
+        <div class="zone__label">今日小愿望</div>
+        <div id="todoList" class="todo__list"></div>
+      </section>
+
+      <!-- 中列 1：糖绒展柜 -->
+      <section id="zoneShow" class="zone">
+        <div class="zone__label">潮玩展柜</div>
+        <div class="show__head" data-hit="ui">
+          <div class="show__tabs" id="seriesTabs"></div>
+          <div class="show__count">
+            <button id="slotMinus" title="收起一位">−</button>
+            <span id="slotCount">5 只</span>
+            <button id="slotPlus" title="多站一只">+</button>
+            <button id="poseReset" title="所有玩偶回到默认站位">重排</button>
+          </div>
+        </div>
+        <div class="showcase" data-hit="showcase" id="showcase">
+          <div class="showcase__back" aria-hidden="true"></div>
+          <div class="stage__lamp" aria-hidden="true"></div>
+          <div class="stage__floor" aria-hidden="true"></div>
+          <div id="showGrid" class="stage"></div>
+        </div>
+      </section>
+
+      <!-- 中列 2：地毯上的散乱资料 -->
+      <section id="zoneFloor" class="zone">
+        <div class="carpet" aria-hidden="true"><div class="carpet__fur"></div></div>
+        <div id="floorFiles" class="floor__files"></div>
+        <div id="selectbar" class="selectbar">
+          <span>已选 <b id="selCount">0</b> 张</span>
+          <button id="btnShelveAll">放上书架</button>
+          <button id="btnSelClear">清空</button>
+        </div>
+      </section>
+
+      <!-- 右列 1：五层糖果书架 -->
+      <section id="zoneShelf" class="zone">
+        <div class="zone__label">糖果书架</div>
+        <div id="shelfGrid" class="shelf__grid"></div>
+      </section>
+
+      <!-- 右列 2：糖霜唱片机 -->
+      <section id="zoneMusic" class="zone" data-hit="music">
+        <div class="music">
+          <div class="music__disc" id="disc"><div class="music__label"></div></div>
+          <!-- 唱臂不放进 disc，否则会跟着唱片一起转；概念稿里它斜搭在盘面上 -->
+          <svg class="music__arm" viewBox="0 0 92 92" aria-hidden="true">
+            <path d="M78 10 L36 52" fill="none" stroke="#FFF9F4" stroke-width="6" stroke-linecap="round"/>
+            <path d="M78 10 L36 52" fill="none" stroke="#D8B6C8" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>
+            <circle cx="78" cy="10" r="8" fill="#FFF1F6" stroke="#D8B6C8" stroke-width="2"/>
+            <circle cx="34" cy="54" r="4.5" fill="#F287B0"/>
+          </svg>
+          <div class="music__body">
+            <div class="music__title">糖霜唱片机</div>
+            <div class="music__row">
+              <button class="mini" id="btnPickAudio">选目录</button>
+              <button class="mini" id="btnPlay">播放</button>
+              <button class="mini" id="btnMode" title="列表循环 / 播完即停 / 单曲循环">模式</button>
+            </div>
+            <div class="music__foot">
+              <div class="music__now" id="musicNow"></div>
+              <div class="music__bar"><i id="musicBar"></i></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="zoneDock" class="dock" data-hit="dock" aria-label="桌面应用快捷方式">
+        <!-- 与其余六个板块一样用白色倾斜胶囊标题，不再用裸小字 -->
+        <div class="zone__label">桌面应用</div>
+        <div class="dock__groups" id="dockGroups"></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div id="tip" aria-hidden="true"></div>
+<div id="toast" aria-live="polite"></div>
+<div id="ctx"></div>
+<div id="veil"></div>
+<div id="modal" role="dialog" aria-modal="true" hidden></div>
+
+<aside id="drawer" aria-hidden="true">
+  <div class="drawer__head"><b>糖绒星球 · 说明</b><button id="drawerClose" aria-label="关闭说明">×</button></div>
+  <div class="drawer__body">
+    <h4>它是什么</h4>
+    <p>一块铺在 Windows 桌面层上的收藏盒：壁纸之上、所有应用之下，不抢焦点，空白处点击穿透给真实桌面。被应用窗口盖住是正常的，按 <kbd>Win</kbd>+<kbd>D</kbd> 或最小化就能看见。</p>
+
+    <h4>桌面的东西去哪了</h4>
+    <p>未收纳的文件会散落在地毯上，用的是系统给的真实图标。拖到书架某一层＝<b>真正移动</b>到桌面上的「糖绒星球书架」文件夹（不是 AppData 深处）；书脊拖出书架＝还原到桌面；拖进糖果罐＝走系统回收站，可恢复。<b>退出 App 时书架会就地解散，文件自动回到桌面原位</b>，下次启动再收回来——即使不再打开这个 App，文件也始终躺在桌面上。</p>
+
+    <h4>怎么玩</h4>
+    <ul>
+      <li>拖动资料卡到书架：单张收纳；打开「点选模式」可点选多张后整组上架。</li>
+      <li>书脊在书架内拖动＝换层 / 排序；拖出书架＝还原；点一下＝打开文件。</li>
+      <li>相册：点空拍立得选图，或把图片拖进去；右键换图 / 清空。相册存的是快照，原图被收进书架也不会碎。</li>
+      <li>展柜：点玩偶上传 PNG / GIF（单张 ≤ 5MB，GIF 动效原样保留）；<b>按住拖动可自由摆放</b>，松手记住位置；<b>鼠标滚轮放大 / 缩小这一只</b>（50%–200%），右键可调前后层级（置于最前 / 最后）；顶部 ‹ › 调整倾斜度（±30°）；双击系列标签可改名。</li>
+      <li>便签：点开可写多行，<kbd>Ctrl</kbd>+<kbd>Enter</kbd> 保存；点 × 撕掉后可撤销；把便签拖进糖果罐会归档成 Markdown。</li>
+      <li>唱片机：选一个装 MP3 的文件夹；三种模式（列表循环 / 播完即停 / 单曲循环）写进配置，重启保留。</li>
+      <li>我的电脑：磁盘与内存是真实读数，点一下有 6 个快捷入口，双击进屏保。</li>
+      <li>画面适配：托盘图标右键 →「画面适配」，可选自动 / 1920×1080 / 2560×1440 / 2880×1620 / 3120×2080。画面会在底部自动留出任务栏安全间距。</li>
+      <li>开机自启动：托盘图标右键 → 勾选「开机自启动」。</li>
+    </ul>
+
+    <h4>数据放哪</h4>
+    <p><code>%APPDATA%\xome-planet\</code>：<code>layout.json</code>（便签与落点）、<code>shelf.json</code> + <code>shelf\</code>（收纳条目与原件）、<code>frames.json</code> + <code>frames\</code>（相册快照）、<code>showcase.json</code> + <code>figures\</code>（展柜形象）、<code>audio.json</code>、<code>journal.jsonl</code>（移动日志）。<b>别删 <code>shelf\</code></b>，那是被收纳的原件。</p>
+
+    <h4>快捷键</h4>
+    <p><kbd>Alt</kbd>+拖 框选资料 · <kbd>Ctrl</kbd>+<kbd>J</kbd> 收纳记录 · <kbd>R</kbd> 重扫桌面 · <kbd>Ctrl</kbd>+<kbd>Q</kbd> 退出</p>
+  </div>
+</aside>
+
+<audio id="audio-el" preload="metadata"></audio>
+
+<script src="model.js"></script>
+<script src="../room/player-state.js"></script>
+<script src="planet.js"></script>
+</body>
+</html>

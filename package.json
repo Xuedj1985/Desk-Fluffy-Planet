@@ -1,0 +1,48 @@
+{
+  "name": "fluffy-planet",
+  "version": "1.0.0",
+  "description": "糖绒星球 · 铺在 Windows 桌面层的玻璃收藏柜（Electron）",
+  "main": "planet/main.js",
+  "license": "MIT",
+  "author": "Fluffy Planet",
+  "homepage": "https://github.com/YOUR_GITHUB_NAME/fluffy-planet#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_GITHUB_NAME/fluffy-planet.git"
+  },
+  "bugs": {
+    "url": "https://github.com/YOUR_GITHUB_NAME/fluffy-planet/issues"
+  },
+  "keywords": [
+    "electron",
+    "desktop",
+    "windows",
+    "desktop-widget",
+    "desktop-pet",
+    "wallpaper",
+    "life-dashboard"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "win32"
+  ],
+  "scripts": {
+    "start": "electron planet/main.js",
+    "planet": "electron planet/main.js",
+    "test:planet": "node planet/test-model.js",
+    "test:store": "node room/test-store.js",
+    "test:player": "node room/test-player-state.js",
+    "test:shelf": "node verify/test-shelf-virtual.js",
+    "test": "node planet/test-model.js && node room/test-store.js && node room/test-player-state.js && node verify/test-shelf-virtual.js",
+    "verify:planet": "node verify/verify-planet.mjs",
+    "smoke:planet": "node verify/smoke-planet-packaged.mjs",
+    "pack:planet": "node tools/pack-planet.mjs",
+    "pack:source": "node tools/pack-source.mjs"
+  },
+  "dependencies": {
+    "electron": "^38.8.6",
+    "koffi": "^3.3.8"
+  }
+}

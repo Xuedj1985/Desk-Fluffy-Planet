@@ -1,0 +1,27 @@
+# 依赖
+node_modules/
+
+# 构建产物 / 安装包（体积大，走 GitHub Releases 分发，不进仓库）
+release/
+build/
+dist/
+out/
+*.zip
+*.7z
+
+# 测试与调试产物
+verify/logs/
+tmp_*/
+*.log
+*.tmp
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swo
+
+# 内部工具目录
+.workbuddy/
